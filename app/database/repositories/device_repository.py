@@ -35,7 +35,7 @@ class DeviceRepository:
                 topics.append(topic)
                 if ip:
                     self._camera_topic_map[topic] = ip
-        logger.info("Loaded %d camera topics from DB", len(topics))
+        # logger.info("Loaded %d camera topics from DB", len(topics))
         return topics
     
     def load_relay_topics(self) -> List[str]:
@@ -51,7 +51,7 @@ class DeviceRepository:
                 topics.append(topic)
                 if ip:
                     self._relay_topic_map[topic] = ip
-        logger.info("Loaded %d relay topics from DB", len(topics))
+        # logger.info("Loaded %d relay topics from DB", len(topics))
         return topics
     
     def get_relays_by_area_id(self, area_id: int) -> List[Dict[str, Any]]:                  

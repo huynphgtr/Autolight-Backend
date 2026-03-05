@@ -49,7 +49,7 @@ class MqttService:
         self.device_controller = DeviceController(device_repository=DeviceRepository(db_conn=self.db_conn))
         self.area_repository = AreaRepository(db_conn=self.db_conn)
         self._camera_topic_map: Dict[str, str] = {}
-        # self._relay_topic_map: Dict[str, str] = {}
+        self._relay_topic_map: Dict[str, str] = {}
 
     # ----- MQTT callbacks -----
     def _on_connect(self, client, userdata, flags, rc):
@@ -64,12 +64,12 @@ class MqttService:
             except Exception as e:
                 logger.exception("Failed to subscribe to %s: %s", c, e)        
         
-        for r in relay_topics:
-            try:
-                client.subscribe(r, qos=1)
-                logger.info("Subscribed to relay topic: %s", r)
-            except Exception as e:
-                logger.exception("Failed to subscribe to %s: %s", r, e)
+        # for r in relay_topics:
+        #     try:
+        #         client.subscribe(r, qos=1)
+        #         logger.info("Subscribed to relay topic: %s", r)
+        #     except Exception as e:
+        #         logger.exception("Failed to subscribe to %s: %s", r, e)
 
     def _on_disconnect(self, client, userdata, rc):
         logger.warning("Disconnected from MQTT broker (rc=%s)", rc)

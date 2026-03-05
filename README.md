@@ -117,14 +117,18 @@ This simulates device inputs (person count, lux values) and tests the lighting d
 
 ### Area Management
 - `GET /api/areas` - List all areas
-- `POST /api/areas` - Create area with configuration
+- `GET /api/areas/status` - List all areas with their current status, mode, and config
+- `POST /api/areas` - Create area with base configuration
 - `GET /api/areas/{area_id}` - Get area details
-- `PUT /api/areas/{area_id}` - Update area configuration
+- `PUT /api/areas/{area_id}` - Update area definition
+- `PUT /api/areas/{area_id}/config` - Update area AI thresholds (min_person, lux_threshold, off_delay, override_timeout)
 - `DELETE /api/areas/{area_id}` - Delete area
+- `GET /api/areas/{area_id}/history` - Get lighting decision history logs for the area
 
-### Lighting Decision
+### Lighting Decision & Control
 - `POST /api/areas/{area_id}/decide` - Get lighting decision for area (person_count, lux input)
 - `POST /api/areas/{area_id}/control` - Send control command to devices in area
+- `POST /api/areas/{area_id}/manual` - Set temporary manual override (P1) for an area (ON/OFF)
 
 ## Key Services
 
@@ -156,10 +160,11 @@ Test device that simulates person detection and lux sensor inputs without real h
 
 ## Database Models
 
-- **Area** - Lighting zones with configuration (min_person, lux_threshold, off_delay)
+- **Area** - Lighting zones with configuration (min_person, lux_threshold, off_delay, override_timeout)
 - **Device** - IoT lighting devices identified by IP address
 - **Schedule** - Time-based lighting automation rules per area
 - **Override** - Manual control overrides with expiration time
+- **HistoryLog** - Records of lighting decisions and system events for auditing
 
 ## CORS Configuration
 

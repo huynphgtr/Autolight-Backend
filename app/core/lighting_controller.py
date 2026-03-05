@@ -35,8 +35,7 @@ class LightingController:
 
         # 1. Nếu có lệnh ON hoặc MANUAL, phải hủy Timer tắt trễ ngay lập tức
         if action in ["ON", "MANUAL"]:
-            self._cancel_off_timer(area_id)            
-            # Thực hiện cập nhật trạng thái ON (nếu cần)
+            self._cancel_off_timer(area_id)   
             if action == "ON":
                 self._execute_on(area_id, decision)
         

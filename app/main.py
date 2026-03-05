@@ -3,8 +3,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.services.mqtt_service import start_mqtt
 from app.api.api import api_router 
-
-
 from app.database.db import get_db_connection
 from app.database.repositories.area_repository import AreaRepository
 import threading
@@ -79,25 +77,21 @@ def check_schedules_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  
-    print("Starting up services...")  
-    # 0. Tạo tất cả các bảng trong cơ sở dữ liệu nếu chưa tồn tại
-    # print("Initializing database...")
-    # init_db()
-    # print("Database tables created successfully!")
-        
-    # 2. Khởi chạy MQTT Client (Lắng nghe tín hiệu từ AI)
+    print("Starting up services...")         
+    
+    # Start MQTT Service
     try:
         start_mqtt()
         print("MQTT Service start listenting...")
     except Exception as e:
         print(f"Error when starting MQTT: {e}")
 
-    # 3. Khởi chạy Background Task kiểm tra timeout
+    # Start Background Task kiểm tra timeout
     timeout_thread = threading.Thread(target=check_manual_timeout, daemon=True)
     timeout_thread.start()
     print("Background Job 'check_manual_timeout' started...")
 
-    # 4. Khởi chạy Background Task kiểm tra Lịch trình (Schedules)
+    # Start Background Task kiểm tra Lịch trình (Schedules)
     schedule_thread = threading.Thread(target=check_schedules_loop, daemon=True)
     schedule_thread.start()
     print("Background Job 'check_schedules_loop' started...")
@@ -107,10 +101,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Campus Lighting System", lifespan=lifespan)
 
-# Cấu hình CORS
+# Config CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

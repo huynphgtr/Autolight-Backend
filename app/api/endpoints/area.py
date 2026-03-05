@@ -32,7 +32,6 @@ class AreaConfigUpdateRequest(BaseModel):
     override_timeout: Optional[int] = Field(None, ge=0, description="Duration of manual override before reverting to AUTO")
     off_delay: Optional[int] = Field(None, ge=0, description="Delay in seconds before turning lights OFF when empty")
 
-
 @router.get("/status", response_model=List[Dict[str, Any]])
 def get_list_areas_status(
                     area_controller: AreaController = Depends(get_area_repo),
@@ -103,16 +102,16 @@ def override_area(
     if _mqtt_instance and _mqtt_instance.lighting_controller:
         _mqtt_instance.lighting_controller._cancel_off_timer(area_id)
         
-    if _mqtt_instance and _mqtt_instance._client:
-        pub_payload = {"command": payload.state, "meta": {"source": "override", "reason": "manual_override"}}
-        text = json.dumps(pub_payload)        
-        # Lấy danh sách relay
-        relays = device_controller.get_relays_for_area(area_id)
-        for topic in relays:
-            try:
-                _mqtt_instance._client.publish(topic, text, qos=1)
-            except Exception as e:
-                pass
+        # Khởi tạo payload metadata rõ ràng
+        decision_meta = {"source": "override", "reason": "manual_override"}
+        
+        try:
+            # Gọi trực tiếp _publish_mqtt, tính năng gửi tới tất cả relay topic đã được hàm này bao hàm
+            _mqtt_instance.lighting_controller._publish_mqtt(area_id, payload.state, decision_meta)
+        except Exception as e:
+            # Nên in log lỗi ra để dễ debug thay vì pass ngầm
+            import logging
+            logging.error(f"Failed to publish manual override MQTT for area {area_id}: {e}")
 
     # 5. Trả về kết quả mới nhất
     status = area_controller.get_override_status(area_id)
