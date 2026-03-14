@@ -9,7 +9,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-BROKER = "broker.emqx.io"
+BROKER = "100.115.124.116"
 PORT = 1883
 DB_PATH = "app.db"
 
@@ -51,19 +51,20 @@ class CameraSimulator:
 
                 for cam in self.camera_list:
                     # Tạo dữ liệu giả lập
+                    # person_count: 0 khi không người, random 0-10 khi có
+                    # brightness: 1=tối, 2=mờ, 3=trung bình, 4=sáng
                     p_count = 0 if is_empty else random.randint(0, 10)
-                    lux_val = 500 if is_empty else random.randint(50, 800)
+                    bright_level = 4 if is_empty else random.randint(1, 4)
 
-                    # PAYLOAD QUAN TRỌNG: Gửi kèm IP để Backend tra cứu map
+                    # PAYLOAD: Chỉ gửi 2 thông số, không có IP
+                    # Backend sẽ dùng MQTT topic để tra cứu device/area
                     payload = {
-                        "ip": cam["ip"],
                         "person_count": p_count,
-                        "lux": lux_val,
-                        "timestamp": datetime.now().isoformat()
+                        "brightness": bright_level
                     }
 
                     self.client.publish(cam["topic"], json.dumps(payload))
-                    logger.info(f"Sent to {cam['topic']} (IP: {cam['ip']}): {p_count} người, {lux_val} lux")
+                    logger.info(f"Sent to {cam['topic']}: {p_count} người, brightness={bright_level}")
 
                 time.sleep(5)
                 if elapsed > 90: self.start_time = time.time()

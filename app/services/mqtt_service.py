@@ -1,7 +1,8 @@
 """MQTT Service using paho-mqtt to subscribe to camera topics and publish relay commands.
 
 - Connects to broker and subscribes to camera topics stored in DB.
-- On JSON message: extracts ip, person_count, lux and calls LightingController.decide.
+- On JSON message: extracts person_count and brightness (1-4), converts brightness to lux,
+  looks up device/area by MQTT topic, and calls LightingController.decide.
 - Publishes resulting command to relay topic(s) in the same area.
 
 Usage:
@@ -74,6 +75,15 @@ class MqttService:
     def _on_disconnect(self, client, userdata, rc):
         logger.warning("Disconnected from MQTT broker (rc=%s)", rc)
 
+    # Bảng chuyển đổi brightness (1-4) sang giá trị lux
+    # 1=tối, 2=mờ, 3=trung bình, 4=sáng
+    BRIGHTNESS_TO_LUX = {
+        1: 100.0,   # Tối
+        2: 300.0,   # Mờ
+        3: 500.0,   # Trung bình
+        4: 800.0,   # Sáng
+    }
+
     def _on_message(self, client, userdata, msg):
         payload = msg.payload.decode("utf-8", errors="ignore")
         logger.debug("Received message on %s: %s", msg.topic, payload)
@@ -85,14 +95,7 @@ class MqttService:
             logger.warning("Skipping non-JSON message from %s", msg.topic)
             return
 
-        # Extract fields with tolerant keys
-        ip = (
-            data.get("ip")
-            or data.get("ip_address")
-            or data.get("camera_ip")
-            or self._camera_topic_map.get(msg.topic)
-        )
-
+        # --- Extract 2 thông số từ AI: person_count và brightness ---
         person_count = (
             data.get("person_count")
             or data.get("current_person_count")
@@ -100,47 +103,47 @@ class MqttService:
             or data.get("people")
         )
 
-        lux = data.get("lux") or data.get("illuminance") or data.get("lux_value")
+        brightness = (
+            data.get("brightness")
+            or data.get("bright")
+            or data.get("light_level")
+        )
 
-        if ip is None:
-            logger.warning("Message on %s missing ip and topic not mapped; skipping", msg.topic)
-            return
-
-        # Normalize person_count and lux
-        # lux: dark, dim, medium, bright -> numeric
+        # Normalize person_count
         try:
             person_count = int(person_count) if person_count is not None else 0
         except Exception:
             person_count = 0
+
+        # Convert brightness (1-4) -> lux value
         try:
-            if isinstance(lux, str):
-                s = lux.strip().lower()
-                if s in ("dark", "low", "dim"):
-                    lux = 100.0
-                elif s in ("medium", "med", "normal"):
-                    lux = 300.0
-                elif s in ("bright", "high"):
-                    lux = 600.0
-                else:
-                    lux = float(s)
-            else:
-                lux = float(lux) if lux is not None else 99999.0
+            brightness = int(brightness) if brightness is not None else None
         except Exception:
+            brightness = None
+
+        if brightness is not None and brightness in self.BRIGHTNESS_TO_LUX:
+            lux = self.BRIGHTNESS_TO_LUX[brightness]
+        else:
+            # Nếu brightness không hợp lệ, mặc định rất sáng (không bật đèn)
             lux = 99999.0
+            logger.warning("Invalid brightness=%s from %s; defaulting lux=99999", brightness, msg.topic)
 
-        logger.info("Processing camera message: ip=%s persons=%s lux=%s", ip, person_count, lux)
-
-        # Lookup area by device ip FIRST before passing to process_decision
-        dev = self.device_controller.get_device_by_ip(ip)
+        # --- Tra cứu device bằng MQTT topic (thay vì IP) ---
+        dev = self.device_controller.get_device_by_topic(msg.topic)
         if not dev:
-            logger.warning("No device found with ip=%s; cannot find relay topics", ip)
+            logger.warning("No device found for topic=%s; skipping", msg.topic)
             return
+
+        ip = dev.get("ip_address", "unknown")
         area_id = dev.get("area_id")
         if area_id is None:
-            logger.warning("Device record for ip=%s missing area_id", ip)
+            logger.warning("Device for topic=%s missing area_id", msg.topic)
             return
 
-        # Decide action
+        logger.info("Processing AI message: topic=%s persons=%s brightness=%s (lux=%.1f) area=%s",
+                     msg.topic, person_count, brightness, lux, area_id)
+
+        # --- Tái sử dụng logic quyết định đèn (decide + process_decision) ---
         decision = self.lighting_controller.decide(ip, person_count, lux)
         action = decision.get("action")
         if not action or action == "NOOP":
