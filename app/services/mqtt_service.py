@@ -51,6 +51,7 @@ class MqttService:
         self.area_repository = AreaRepository(db_conn=self.db_conn)
         self._camera_topic_map: Dict[str, str] = {}
         self._relay_topic_map: Dict[str, str] = {}
+        self.area_data_cache = {}
 
     # ----- MQTT callbacks -----
     def _on_connect(self, client, userdata, flags, rc):
@@ -96,38 +97,47 @@ class MqttService:
             return
 
         # --- Extract 2 thông số từ AI: person_count và brightness ---
-        person_count = (
-            data.get("person_count")
-            or data.get("current_person_count")
-            or data.get("count")
-            or data.get("people")
-        )
+        raw_count = data.get("people") or data.get("current_person_count") or data.get("count") or 0
+        raw_brightness = data.get("light_level") or data.get("bright") or data.get("brightness") or 0
 
-        brightness = (
-            data.get("brightness")
-            or data.get("bright")
-            or data.get("light_level")
-        )
+        # person_count = (
+        #     data.get("person_count")
+        #     or data.get("current_person_count")
+        #     or data.get("count")
+        #     or data.get("people")
+        # )
+
+        # brightness = (
+        #     data.get("brightness")
+        #     or data.get("bright")
+        #     or data.get("light_level")
+        # )
 
         # Normalize person_count
         try:
-            person_count = int(person_count) if person_count is not None else 0
+            # person_count = int(person_count) if person_count is not None else 0
+            current_cam_count = int(raw_count)
+            brightness_val = int(raw_brightness)
         except Exception:
-            person_count = 0
+            # person_count = 0
+            current_cam_count = 0
+            brightness_val = 0
 
         # Convert brightness (1-4) -> lux value
-        try:
-            brightness = int(brightness) if brightness is not None else None
-        except Exception:
-            brightness = None
+        # try:
+        #     brightness = int(brightness) if brightness is not None else None
+        # except Exception:
+        #     brightness = None
 
-        if brightness is not None and brightness in self.BRIGHTNESS_TO_LUX:
-            lux = self.BRIGHTNESS_TO_LUX[brightness]
-        else:
-            # Nếu brightness không hợp lệ, mặc định rất sáng (không bật đèn)
-            lux = 99999.0
-            logger.warning("Invalid brightness=%s from %s; defaulting lux=99999", brightness, msg.topic)
-
+        # if brightness is not None and brightness in self.BRIGHTNESS_TO_LUX:
+        #     lux = self.BRIGHTNESS_TO_LUX[brightness]
+        # else:
+        #     # Nếu brightness không hợp lệ, mặc định rất sáng (không bật đèn)
+        #     lux = 99999.0
+        #     logger.warning("Invalid brightness=%s from %s; defaulting lux=99999", brightness, msg.topic)
+        
+        current_cam_lux = self.BRIGHTNESS_TO_LUX.get(brightness_val, 99999.0)
+        
         # --- Tra cứu device bằng MQTT topic (thay vì IP) ---
         dev = self.device_controller.get_device_by_topic(msg.topic)
         if not dev:
@@ -141,10 +151,34 @@ class MqttService:
             return
 
         logger.info("Processing AI message: topic=%s persons=%s brightness=%s (lux=%.1f) area=%s",
-                     msg.topic, person_count, brightness, lux, area_id)
+                     msg.topic, current_cam_count, brightness_val, current_cam_lux, area_id)
 
+        # --- CẬP NHẬT CACHE ĐA CAMERA ---
+        if area_id not in self.area_data_cache:
+            self.area_data_cache[area_id] = {}
+
+        # Lưu giá trị mới nhất của camera này vào cache của Area
+        self.area_data_cache[area_id][msg.topic] = {
+            "count": current_cam_count,
+            "lux": current_cam_lux
+        }
+
+        total_person_count = 0
+        min_lux = 99999.0
+
+        # Duyệt qua tất cả camera đã từng gửi tin nhắn trong Area này
+        for topic, values in self.area_data_cache[area_id].items():
+            total_person_count += values["count"]
+            # Thường thì chỉ cần 1 góc tối là cần bật đèn, nên ta lấy Min Lux
+            if values["lux"] < min_lux:
+                min_lux = values["lux"]
+
+        logger.info(f"Area {area_id} Aggregation: Topics={len(self.area_data_cache[area_id])} "
+                    f"Total Persons={total_person_count}, Min Lux={min_lux}")
+        
         # --- Tái sử dụng logic quyết định đèn (decide + process_decision) ---
-        decision = self.lighting_controller.decide(ip, person_count, lux)
+        # decision = self.lighting_controller.decide(ip, person_count, lux)
+        decision = self.lighting_controller.decide(ip, total_person_count, min_lux)
         action = decision.get("action")
         if not action or action == "NOOP":
             return
