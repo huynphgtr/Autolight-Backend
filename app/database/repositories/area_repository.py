@@ -92,7 +92,7 @@ class AreaRepository:
              min_p = decision.get("min_person", "N/A")
              min_lux = decision.get("lux_threshold", "N/A")
              time_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-             detail_str = f"{description} | People (real/min): {p_count}/{min_p} | Light (real/min): {lux}/{min_lux}"
+             detail_str = f"{description} Time: {time_str} | People (real/min): {p_count}/{min_p} | Light (real/min): {lux}/{min_lux}"
         else:
              detail_str = description
 

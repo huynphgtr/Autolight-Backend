@@ -54,15 +54,15 @@ class CameraSimulator:
                 # 60-90s: Một camera thấy người, camera kia không thấy (Test cộng dồn)
                 
                 # if elapsed < 30:
-                #     scenario = "CÓ NGƯỜI RẢI RÁC"
-                #     def get_data(): return random.randint(1, 3), random.randint(1, 2)
+                scenario = "CÓ NGƯỜI RẢI RÁC"
+                def get_data(): return random.randint(1, 3), random.randint(1, 2)
                 # elif 30 <= elapsed < 60:
                 #     scenario = "KHU VỰC TRỐNG"
                 #     def get_data(): return 0, 4
                 # else:
-                scenario = "TEST CỘNG DỒN (Cam 1 có, Cam 2 không)"
+                # scenario = "TEST CỘNG DỒN (Cam 1 có, Cam 2 không)"
                 # Giả lập: chỉ cam đầu tiên của mỗi area thấy người
-                def get_data(is_first): return (random.randint(2, 5), 1) if is_first else (0, 4)
+                # def get_data(is_first): return (random.randint(2, 5), 1) if is_first else (0, 4)
 
                 logger.info(f"=== Kịch bản: {scenario} (Elapsed: {int(elapsed)}s) ===")
 
