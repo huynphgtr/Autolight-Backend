@@ -52,13 +52,13 @@ class AreaRepository:
         self.db.commit()
 
     def check_and_clear_manual_timeouts(self) -> List[int]:
-        """Tìm các khu vực có current_mode='MANUAL' và override_until < now, cập nhật về AUTO."""
+        """Tìm các khu vực có current_mode='MANUAL_ON/OFF' và override_until < now, cập nhật về AUTO."""
         from datetime import timezone
         tz_vn = timezone(timedelta(hours=7))
         now_str = datetime.now(tz_vn).strftime("%Y-%m-%d %H:%M:%S")
         
         cur = self.db.execute(
-            "SELECT area_id FROM area_status WHERE current_mode = 'MANUAL' AND override_until < ?",
+            "SELECT area_id FROM area_status WHERE current_mode LIKE 'MANUAL_%' AND override_until < ?",
             (now_str,)
         )
         expired_areas = [row["area_id"] for row in cur.fetchall()]

@@ -91,7 +91,7 @@ def override_area(
     try:
         area_controller.update_area_status(
             area_id=area_id, 
-            current_mode='MANUAL', 
+            current_mode=f'MANUAL_{payload.state}', 
             last_priority=1, 
             override_until=override_until
         )
