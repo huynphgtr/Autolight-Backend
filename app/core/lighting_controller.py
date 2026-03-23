@@ -42,14 +42,14 @@ class LightingController:
         # 2. Xử lý logic Tắt trễ
         elif action == "OFF_DELAYED":
             off_delay = decision.get("off_delay", 0)
-            self._start_off_timer(area_id, off_delay)
+            self._start_off_timer(area_id, off_delay, decision)
 
         # 3. Nếu là OFF thuần túy (không delay)
         elif action == "OFF":
             self._cancel_off_timer(area_id)
-            self._execute_off(area_id)
+            self._execute_off(area_id, decision)
 
-    def _start_off_timer(self, area_id: int, delay: int):
+    def _start_off_timer(self, area_id: int, delay: int, decision: Dict[str, Any] = None):
         """Khởi tạo bộ đếm ngược để tắt đèn"""
         with self._lock:
             # Nếu đã có Timer đang chạy cho khu vực này, không tạo thêm cái mới
@@ -59,7 +59,7 @@ class LightingController:
             logger.info(f"[TIMER] Starting {delay}s OFF delay for Area {area_id}")
             
             # Tạo Timer: sau 'delay' giây sẽ gọi hàm _execute_off
-            timer = threading.Timer(delay, self._execute_off, args=[area_id])
+            timer = threading.Timer(delay, self._execute_off, args=[area_id, decision])
             self._off_timers[area_id] = timer
             timer.start()
 
@@ -94,14 +94,14 @@ class LightingController:
         except Exception as e:
             logger.error(f"[ACTUATOR] Failed to publish MQTT: {e}")
 
-    def _execute_off(self, area_id: int):
+    def _execute_off(self, area_id: int, decision: Dict[str, Any] = None):
         """Hành động thực thi tắt đèn khi Timer kết thúc"""
         with self._lock:
             # Xóa khỏi danh sách quản lý nếu Timer tự kết thúc
             self._off_timers.pop(area_id, None)
 
         # 1. Cập nhật Database
-        self.repo.set_area_auto(area_id=area_id, state="OFF", description="Auto OFF by system")
+        self.repo.set_area_auto(area_id=area_id, state="OFF", description="Auto OFF by system", decision=decision)
         
         # 2. Gửi lệnh tới Relay 
         self._publish_mqtt(area_id, "OFF")
@@ -109,7 +109,7 @@ class LightingController:
     def _execute_on(self, area_id: int, decision: Dict[str, Any]):
         """Hành động thực thi bật đèn"""
         # Cập nhật DB
-        self.repo.set_area_auto(area_id=area_id, state="ON", description=decision.get("reason", "Auto ON by system"))
+        self.repo.set_area_auto(area_id=area_id, state="ON", description=decision.get("reason", "Auto ON by system"), decision=decision)
         
         # Gửi lệnh tới Relay
         self._publish_mqtt(area_id, "ON", decision)
@@ -174,13 +174,13 @@ class LightingController:
             lux_ok = False
 
         if person_ok and lux_ok:
-            return {"action": "ON", "source": "auto", "reason": "presence_and_low_lux", "person_count": person_count, "lux": lux}
+            return {"action": "ON", "source": "auto", "reason": "presence_and_low_lux", "person_count": person_count, "lux": lux, "min_person": min_person, "lux_threshold": lux_threshold}
 
         # Not meeting ON condition -> apply off_delay before OFF
         if off_delay and off_delay > 0:
-            return {"action": "OFF_DELAYED", "source": "auto", "off_delay": off_delay, "reason": "thresholds_not_met", "person_count": person_count, "lux": lux}
+            return {"action": "OFF_DELAYED", "source": "auto", "off_delay": off_delay, "reason": "thresholds_not_met", "person_count": person_count, "lux": lux, "min_person": min_person, "lux_threshold": lux_threshold}
 
-        return {"action": "OFF", "source": "auto", "reason": "thresholds_not_met", "person_count": person_count, "lux": lux}
+        return {"action": "OFF", "source": "auto", "reason": "thresholds_not_met", "person_count": person_count, "lux": lux, "min_person": min_person, "lux_threshold": lux_threshold}
     
     # ----- Helper methods -----
     def _normalize_state_from_schedule(self, schedule_row: Dict[str, Any]) -> Optional[str]:

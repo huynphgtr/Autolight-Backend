@@ -84,8 +84,17 @@ class AreaRepository:
         self.db.commit()
         return expired_areas
 
-    def set_area_auto(self, area_id: int, state: str, description: str) -> None:
+    def set_area_auto(self, area_id: int, state: str, description: str, decision: dict = None) -> None:
         """Excute login update area_status and history_log"""
+        if decision:
+             p_count = decision.get("person_count", "N/A")
+             lux = decision.get("lux", "N/A")
+             min_p = decision.get("min_person", "N/A")
+             min_lux = decision.get("lux_threshold", "N/A")
+             time_str = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+             detail_str = f"{description} Time: {time_str} | People (real/min): {p_count}/{min_p} | Light (real/min): {lux}/{min_lux}"
+        else:
+             detail_str = description
 
         # update or insert area_status
         cur = self.db.execute("SELECT area_id FROM area_status WHERE area_id = ?", (area_id,))
@@ -105,7 +114,7 @@ class AreaRepository:
             (
                 area_id,
                 "auto",
-                f"Auto mode set to {state} for area. Detail: {description}",
+                f"Auto mode set to {state}, reason: {detail_str}",
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ),
         )
