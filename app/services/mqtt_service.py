@@ -35,7 +35,7 @@ class MqttService:
         client_id: Optional[str] = None,
         DATABASE_URL: Optional[str] = None,
     ) -> None:
-        self.broker_host = os.getenv("BROKER_HOST", "broker.emqx.io")
+        self.broker_host = os.getenv("BROKER_HOST", "100.99.88.11")
         self.broker_port = int(os.getenv("BROKER_PORT", "1883"))
         self.keepalive = int(os.getenv("KEEPALIVE", "60"))
         self.client_id = os.getenv("CLIENT_ID", "autolight-controller")
